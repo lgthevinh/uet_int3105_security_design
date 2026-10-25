@@ -30,4 +30,12 @@ public class UserService {
     public User create(CreateUserRequest request) {
         return userRepository.save(request.name(), request.email());
     }
+
+    public User updateAvatar(Long id, String avatarUrl) {
+        User user = userRepository.updateAvatar(id, avatarUrl);
+        if (user == null) {
+            throw new NotFoundException("User " + id + " not found");
+        }
+        return user;
+    }
 }

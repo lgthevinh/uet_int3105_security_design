@@ -33,4 +33,8 @@ public class UserRepository {
         users.put(id, user);
         return user;
     }
+
+    public User updateAvatar(Long id, String avatarUrl) {
+        return users.computeIfPresent(id, (key, user) -> new User(user.id(), user.name(), user.email(), avatarUrl));
+    }
 }
