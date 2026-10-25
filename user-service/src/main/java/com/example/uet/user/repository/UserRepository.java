@@ -19,12 +19,6 @@ public class UserRepository {
     private final Map<Long, User> users = new ConcurrentHashMap<>();
     private final AtomicLong idSequence = new AtomicLong();
 
-    public UserRepository() {
-        // Seed data so the gateway and /dashboard can be tested right after startup
-        save("Alice", "alice@example.com");
-        save("Bob", "bob@example.com");
-    }
-
     public Collection<User> findAll() {
         return users.values();
     }
