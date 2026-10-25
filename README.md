@@ -1,7 +1,6 @@
 # uet_int3105
 
-Microservices demo for INT3105 (Software Architecture) covering gateway security patterns:
-gateway routing, offloading (JWT check + rate limit), valet key and API aggregation.
+Microservices demo for INT3105 (Software Architecture) covering gateway security patterns: gateway routing, offloading (JWT check + rate limit), valet key and API aggregation.
 
 ## Architecture
 
@@ -22,8 +21,7 @@ client ──▶ gateway (nginx + njs, :8080)
 | minio         | MinIO (S3 API)        | 9000      |
 | minio         | MinIO (console)       | 9001      |
 
-Data is in memory and resets when a service restarts.
-user-service and order-service are also exposed directly (8081, 8082) on purpose, to compare calls with and without the gateway.
+Data is in memory and resets when a service restarts. user-service and order-service are also exposed directly (8081, 8082) on purpose, to compare calls with and without the gateway.
 
 ## Run
 
@@ -32,8 +30,7 @@ make compose   # docker compose up -d --build
 make down      # docker compose down
 ```
 
-Set `JWT_SECRET` (at least 32 bytes) to override the dev default; it must be the same for the gateway and user-service.
-MinIO console: http://localhost:9001 (`minioadmin` / `minioadmin`).
+Set `JWT_SECRET` (at least 32 bytes) to override the dev default; it must be the same for the gateway and user-service. MinIO console: http://localhost:9001 (`minioadmin` / `minioadmin`).
 
 Seeded users: `alice@example.com` and `bob@example.com`, password `password123`.
 
@@ -56,7 +53,8 @@ Seeded users: `alice@example.com` and `bob@example.com`, password `password123`.
 | GET | `/api/v1/users`, `/api/v1/users/{id}` | JWT | List / get users |
 | POST | `/api/v1/users/me/avatar/upload-form` | JWT | Signed MinIO POST form for an avatar |
 | PUT | `/api/v1/users/me/avatar` | JWT | Confirm upload, set `avatarUrl` |
-| GET, POST | `/api/v1/orders` (`?userId=`) | JWT | List / create orders |
+| GET | `/api/v1/orders` (`?userId=`) | JWT | List |
+| POST | `/api/v1/orders` (`?userId=`) | JWT | Create orders |
 | GET | `/api/v1/orders/{id}` | JWT | Get order |
 | GET | `/api/v1/dashboard` | JWT | Caller's user + orders |
 | GET | `/storage/avatars/{key}` | – | Public avatar image |
