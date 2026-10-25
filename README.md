@@ -54,7 +54,7 @@ Seeded users: `alice@example.com` and `bob@example.com`, password `password123`.
 | POST | `/api/v1/users/me/avatar/upload-form` | JWT | Signed MinIO POST form for an avatar |
 | PUT | `/api/v1/users/me/avatar` | JWT | Confirm upload, set `avatarUrl` |
 | GET | `/api/v1/orders` (`?userId=`) | JWT | List |
-| POST | `/api/v1/orders` (`?userId=`) | JWT | Create orders |
+| POST | `/api/v1/orders` | JWT | Create order (`userId` in body) |
 | GET | `/api/v1/orders/{id}` | JWT | Get order |
 | GET | `/api/v1/dashboard` | JWT | Caller's user + orders |
 | GET | `/storage/avatars/{key}` | – | Public avatar image |
