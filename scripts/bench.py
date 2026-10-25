@@ -6,17 +6,19 @@ Each scenario sends the same request N times and prints latency stats as a Markd
 Requests are paced below the gateway rate limit (10 req/s), otherwise the gateway runs
 would mostly measure 429 responses. Direct calls use the same pacing so both sides are equal.
 
-Usage: python3 scripts/bench.py [-n 100] [--interval 0.12] [--warmup 10]
+Usage: python3 scripts/bench.py [-n 100] [--interval 0.12] [--warmup 10] [--csv results.csv]
 Needs the stack running (make compose). Python 3 standard library only.
 """
 
 import argparse
+import csv
 import json
 import statistics
 import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 
 GATEWAY = "http://localhost:8080"
 USER_SERVICE = "http://localhost:8081"
@@ -57,12 +59,11 @@ def login():
     return body["token"]
 
 
-def client_aggregation(user_id, parallel):
+def client_aggregation(urls, parallel):
     """
     Builds the dashboard on the client by calling both services directly.
     This is the alternative the gateway aggregation replaces, so it is the fair baseline for /dashboard.
     """
-    urls = [f"{USER_SERVICE}/users/{user_id}", f"{ORDER_SERVICE}/orders?userId={user_id}"]
     start = time.perf_counter()
     if parallel:
         with ThreadPoolExecutor(max_workers=2) as pool:
@@ -98,6 +99,15 @@ def percentile(values, p):
     return ordered[index]
 
 
+STAT_COLUMNS = ["min_ms", "mean_ms", "p50_ms", "p95_ms", "p99_ms", "max_ms"]
+
+
+def summarize(times):
+    """Latency stats in STAT_COLUMNS order, shared so the table and the CSV always match."""
+    return [min(times), statistics.mean(times), percentile(times, 50),
+            percentile(times, 95), percentile(times, 99), max(times)]
+
+
 def print_table(rows):
     print("| Scenario | OK | Errors | Min | Mean | P50 | P95 | P99 | Max |")
     print("|---|---|---|---|---|---|---|---|---|")
@@ -105,11 +115,28 @@ def print_table(rows):
         if not times:
             print(f"| {name} | 0 | {errors} | - | - | - | - | - | - |")
             continue
-        stats = [min(times), statistics.mean(times), percentile(times, 50),
-                 percentile(times, 95), percentile(times, 99), max(times)]
-        cells = " | ".join(f"{v:.2f}" for v in stats)
+        cells = " | ".join(f"{v:.2f}" for v in summarize(times))
         print(f"| {name} | {len(times)} | {errors} | {cells} |")
     print("\nTimes in ms. Errors are non-200 responses (429 means the rate limit was hit).")
+
+
+def export_csv(rows, urls_by_scenario, path, args):
+    """
+    Writes the summary stats to a CSV, for charts and tables in the report.
+    The leading comments record the run time, settings and each scenario's URLs,
+    so results from different runs can be told apart and traced back to what was called.
+    """
+    started = datetime.now().astimezone().isoformat(timespec="seconds")
+    with open(path, "w", newline="") as f:
+        f.write(f"# bench at {started}, n={args.n}, warmup={args.warmup}, interval={args.interval}s\n")
+        for name, urls in urls_by_scenario.items():
+            f.write(f"# {name} -> GET {' + '.join(urls)}\n")
+        writer = csv.writer(f)
+        writer.writerow(["scenario", "ok", "errors", *STAT_COLUMNS])
+        for name, times, errors in rows:
+            stats = [f"{v:.2f}" for v in summarize(times)] if times else [""] * len(STAT_COLUMNS)
+            writer.writerow([name, len(times), errors, *stats])
+    print(f"\nCSV written to {path}")
 
 
 def main():
@@ -118,6 +145,7 @@ def main():
     parser.add_argument("--warmup", type=int, default=10, help="untimed requests per scenario")
     parser.add_argument("--interval", type=float, default=0.12,
                         help="seconds between requests, keep >= 0.1 to stay under 10 req/s")
+    parser.add_argument("--csv", metavar="PATH", help="also write the summary stats to this CSV file")
     args = parser.parse_args()
 
     token = login()
@@ -128,23 +156,35 @@ def main():
     def simple(url, headers=None):
         return lambda: call(url, headers)[:2]
 
+    user_direct = f"{USER_SERVICE}/users/{user_id}"
+    user_gateway = f"{GATEWAY}/api/v1/users/{user_id}"
+    orders_direct = f"{ORDER_SERVICE}/orders?userId={user_id}"
+    orders_gateway = f"{GATEWAY}/api/v1/orders?userId={user_id}"
+    dashboard_direct = [user_direct, orders_direct]
+    dashboard_gateway = f"{GATEWAY}/api/v1/dashboard"
+
+    # (name, URLs called, request function); the URLs are only recorded in the CSV
     scenarios = [
-        ("user: direct", simple(f"{USER_SERVICE}/users/{user_id}")),
-        ("user: gateway", simple(f"{GATEWAY}/api/v1/users/{user_id}", auth)),
-        ("orders: direct", simple(f"{ORDER_SERVICE}/orders?userId={user_id}")),
-        ("orders: gateway", simple(f"{GATEWAY}/api/v1/orders?userId={user_id}", auth)),
-        ("dashboard: direct x2 sequential", lambda: client_aggregation(user_id, parallel=False)),
-        ("dashboard: direct x2 parallel", lambda: client_aggregation(user_id, parallel=True)),
-        ("dashboard: gateway aggregation", simple(f"{GATEWAY}/api/v1/dashboard", auth)),
+        ("user: direct", [user_direct], simple(user_direct)),
+        ("user: gateway", [user_gateway], simple(user_gateway, auth)),
+        ("orders: direct", [orders_direct], simple(orders_direct)),
+        ("orders: gateway", [orders_gateway], simple(orders_gateway, auth)),
+        ("dashboard: direct x2 sequential", dashboard_direct,
+         lambda: client_aggregation(dashboard_direct, parallel=False)),
+        ("dashboard: direct x2 parallel", dashboard_direct,
+         lambda: client_aggregation(dashboard_direct, parallel=True)),
+        ("dashboard: gateway aggregation", [dashboard_gateway], simple(dashboard_gateway, auth)),
     ]
 
     est = len(scenarios) * (args.n + args.warmup) * args.interval
     print(f"Running {len(scenarios)} scenarios x {args.n} requests (~{est:.0f}s)...\n")
 
     rows = []
-    for name, fn in scenarios:
+    for name, _, fn in scenarios:
         rows.append(run(name, fn, args.n, args.warmup, args.interval))
     print_table(rows)
+    if args.csv:
+        export_csv(rows, {name: urls for name, urls, _ in scenarios}, args.csv, args)
 
 
 if __name__ == "__main__":
