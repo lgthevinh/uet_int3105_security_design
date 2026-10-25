@@ -61,6 +61,7 @@ public class AvatarService {
         if (extension == null) {
             throw new BadRequestException("Content type must be one of " + ALLOWED_TYPES.keySet());
         }
+        // check if user exist, throw NotFoundException if not
         userService.getById(userId);
         ensureBucket();
 
