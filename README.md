@@ -28,11 +28,22 @@ Data is in memory and resets when a service restarts. user-service and order-ser
 ```bash
 make compose   # docker compose up -d --build
 make down      # docker compose down
+make bench     # direct vs gateway latency, writes result_<unix time>.csv
 ```
 
 Set `JWT_SECRET` (at least 32 bytes) to override the dev default; it must be the same for the gateway and user-service. MinIO console: http://localhost:9001 (`minioadmin` / `minioadmin`).
 
 Seeded users: `alice@example.com` and `bob@example.com`, password `password123`.
+
+## Benchmark
+
+`make bench` runs `scripts/bench.py` against the running stack (`make compose` first) and takes about 80s.
+It compares calling user-service / order-service directly (8081, 8082) with calling them through the gateway, and the dashboard built by the client vs by the gateway.
+
+- Requests are paced under the 10 req/s rate limit, so the gateway runs are not measuring 429s.
+- Prints a Markdown table and writes `result_<unix time>.csv` with min / mean / p50 / p95 / p99 / max in ms; the `#` lines at the top hold the run time, settings and URLs (use `pd.read_csv(path, comment="#")`).
+- Options: `python3 scripts/bench.py -n 300 --interval 0.12 --warmup 10 --csv out.csv`.
+- For the gateway's own overhead, the gateway logs `rt` (whole request) and `urt` (upstream time) per request: `docker compose logs gateway`. `rt - urt` is the time spent in nginx.
 
 ## Tasks
 
