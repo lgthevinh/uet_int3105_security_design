@@ -131,7 +131,8 @@ def export_csv(rows, urls_by_scenario, path, args):
         f.write(f"# bench at {started}, n={args.n}, warmup={args.warmup}, interval={args.interval}s\n")
         for name, urls in urls_by_scenario.items():
             f.write(f"# {name} -> GET {' + '.join(urls)}\n")
-        writer = csv.writer(f)
+        # LF line endings to match the comment lines (csv defaults to CRLF)
+        writer = csv.writer(f, lineterminator="\n")
         writer.writerow(["scenario", "ok", "errors", *STAT_COLUMNS])
         for name, times, errors in rows:
             stats = [f"{v:.2f}" for v in summarize(times)] if times else [""] * len(STAT_COLUMNS)
