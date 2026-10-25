@@ -6,17 +6,17 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Repository;
 
-import com.example.uet.user.model.Credential;
+import com.example.uet.user.model.AuthCredential;
 
 /**
  * In-memory credential store, keyed by email since login looks credentials up by email.
  */
 @Repository
-public class CredentialRepository {
+public class AuthCredentialRepository {
 
-    private final Map<String, Credential> credentialsByEmail = new ConcurrentHashMap<>();
+    private final Map<String, AuthCredential> credentialsByEmail = new ConcurrentHashMap<>();
 
-    public Optional<Credential> findByEmail(String email) {
+    public Optional<AuthCredential> findByEmail(String email) {
         return Optional.ofNullable(credentialsByEmail.get(email));
     }
 
@@ -24,7 +24,7 @@ public class CredentialRepository {
         return credentialsByEmail.containsKey(email);
     }
 
-    public Credential save(Credential credential) {
+    public AuthCredential save(AuthCredential credential) {
         credentialsByEmail.put(credential.email(), credential);
         return credential;
     }
